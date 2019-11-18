@@ -1,0 +1,132 @@
+# import the necessary packages
+from __future__ import print_function
+from imutils.video import VideoStream
+import argparse
+import imutils
+import time
+time.sleep(1) # As i said it is too impatient and so if this delay is removed you will get an error
+
+import cv2
+import os
+import pigpio #importing GPIO library
+import RPi.GPIO as GPIO
+
+ESC=4  #Connect the ESC in this GPIO pin 
+ESC1=3  #Connect the ESC in this GPIO pin
+pi = pigpio.pi();
+pi.set_servo_pulsewidth(ESC, 0)  
+pi = pigpio.pi();
+pi.set_servo_pulsewidth(ESC1, 0) 
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(power_pin, GPIO.OUT)
+GPIO.setup(power_pin1, GPIO.OUT)
+GPIO.setup(12,GPIO.OUT)
+GPIO.setup(32,GPIO.OUT)
+sol=GPIO.PWM(12,50)
+sag=GPIO.PWM(32,50)
+
+width = 500
+angle = 180
+
+# construct the argument parse and parse the arguments
+ap = argparse.ArgumentParser()
+ap.add_argument("-p", "--picamera", type=int, default=-1,
+    help="whether or not the Raspberry Pi camera should be used")
+args = vars(ap.parse_args())
+
+# initialize the video stream and allow the camera sensor to warmup
+print("[INFO] waiting for camera to warmup...")
+vs = VideoStream(usePiCamera=args["picamera"] > 0).start()
+time.sleep(2.0)
+
+colorLower = (32,53,69)#mavi(90,50,50)#yeşil(32,53,69)  #mavi(90,50,50)
+colorUpper = (100,142,223)#mavi(130,255,255)#yeşil(100,142,223)  #mavi(90,50,50)
+
+
+print("\n Positioning servos to initial position ==> Press 'q' to quit Program \n")
+def sol():
+    speed = 1100    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(1)
+
+def sag():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 1000
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(1)
+
+def ileri():
+    speed = 1100    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(1)
+
+def servoPosition (x, y, radius):
+    
+    if (x < width/2-30):
+        print ("sağa dön")
+        sag()
+
+    if (x > width/2+30):
+        print ("sola dön")
+        sol()
+        
+    if (y > angle/2-10):
+        print ("Yukarı bak!")
+    
+    if (y < angle/4-5):
+        print ("Aşağı bak!")
+        
+    if(radius < 250):
+        print("İleri git")
+        ileri()
+    if(radius > 250):
+        print("Geri git")
+    
+while True:
+    frame = vs.read()
+    frame = imutils.resize(frame, width)
+    frame = imutils.rotate(frame, angle)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    mask = cv2.inRange(hsv, colorLower, colorUpper)
+    mask = cv2.erode(mask, None, iterations=2)
+    mask = cv2.dilate(mask, None, iterations=2)
+    # (x, y) center of the object
+    cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE)
+    cnts = cnts[0] 
+    center = None
+
+    if len(cnts) > 0:
+        c = max(cnts, key=cv2.contourArea)
+        ((x, y), radius) = cv2.minEnclosingCircle(c)
+        M = cv2.moments(c)
+        center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+
+        if radius > 10:
+            cv2.circle(frame, (int(x), int(y)), int(radius),
+                (0, 255, 255), 2)
+            servoPosition(int(x), int(y), radius) 
+            cv2.circle(frame, center, 5, (0, 0, 255), -1)
+            
+        else:
+            for i in range(5):
+                time.sleep(3)
+                print ("veri yok")
+                break
+
+    cv2.imshow("Frame",frame)
+    key = cv2.waitKey(1) & 0xFF
+
+    if key == ord("q"):
+        break
+
+# do a bit of cleanup
+print("\n Exiting Program and cleanup stuff \n")
+cv2.destroyAllWindows()
+vs.stop()
