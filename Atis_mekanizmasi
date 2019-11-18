@@ -1,0 +1,33 @@
+import RPi.GPIO as GPIO
+import time
+GPIO.setmode(GPIO.BOARD)
+servoPin=37
+in1 = 19
+in2 = 21
+GPIO.setup(servoPin,GPIO.OUT)
+GPIO.setup(in1,GPIO.OUT)
+GPIO.setup(in2,GPIO.OUT)
+pwm=GPIO.PWM(servoPin,16)
+pwm.start(0)
+
+while(1):
+    
+    GPIO.output(in1,GPIO.HIGH)
+    GPIO.output(in2,GPIO.LOW)
+    time.sleep(30)
+    for i in range(180,75,-1):        
+        DC=1./18.*(i)+2
+        pwm.ChangeDutyCycle(DC)
+        time.sleep(.01)
+        
+        
+pwm.stop()
+GPIO.cleanup()
+    
+    
+
+        
+
+    
+ 
+ 
