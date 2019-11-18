@@ -1,0 +1,937 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Sep 14 01:35:55 2019
+
+@author: Sefa MELEK...
+"""
+import RPi.GPIO as GPIO          
+from time import sleep
+import smbus        #import SMBus module of I2C
+import math
+import os     #importing os library so as to communicate with the system
+os.system ("sudo pigpiod") #Launching GPIO library
+#time.sleep(1) # As i said it is too impatient and so if this delay is removed you will get an error
+import pigpio #importing GPIO library
+
+
+power_pin = 16
+power_pin1 = 18
+
+ESC=4  #Connect the ESC in this GPIO pin 
+ESC1=3  #Connect the ESC in this GPIO pin 
+
+sensor = 11
+sensorsol = 13 #yesilbant
+sensorsag = 15 #beyazbant
+
+Register_A     = 0              #Address of Configuration register A
+Register_B     = 0x01           #Address of configuration register B
+Register_mode  = 0x02           #Address of mode register
+
+X_axis_H    = 0x03              #Address of X-axis MSB data register
+Z_axis_H    = 0x05              #Address of Z-axis MSB data register
+Y_axis_H    = 0x07              #Address of Y-axis MSB data register
+declination = -0.00669          #define declination angle of location where measurement going to be done
+pi          = 3.14159265359     #define pi value
+
+
+yukari.start(2.3)
+sag.start(9.3)
+sol.start(2)
+in1 = 19
+in2 = 21
+en = 23
+temp1=1
+
+yesillower = (37,50,50)
+yesilupper = (65,255,255)
+mavilower = (90,50,50) #yeşil(32,53,69)  #mavi(90,50,50)
+mavuUpper = (130,255,255) #yeşil(100,142,223)  #mavi(90,255,255)
+kirmizlLower = (150,30,30)
+kirmiziupper = (190,255,255)
+
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(in1,GPIO.OUT)
+GPIO.setup(in2,GPIO.OUT)
+GPIO.setup(en,GPIO.OUT)
+GPIO.output(in1,GPIO.LOW)
+GPIO.output(in2,GPIO.LOW)
+GPIO.setup(power_pin, GPIO.OUT)
+GPIO.setup(power_pin1, GPIO.OUT)
+GPIO.setup(sensor,GPIO.IN)
+GPIO.setup(sensorsol,GPIO.IN)
+GPIO.setup(sensorsag,GPIO.IN)
+GPIO.setup(12,GPIO.OUT)
+GPIO.setup(33,GPIO.OUT)
+GPIO.setup(32,GPIO.OUT)
+sol=GPIO.PWM(12,50)
+sag=GPIO.PWM(32,50)
+yukari=GPIO.PWM(33,50)
+p=GPIO.PWM(en,1000)
+
+p.start(25)
+
+pi = pigpio.pi();
+pi.set_servo_pulsewidth(ESC, 0)  
+pi = pigpio.pi();
+pi.set_servo_pulsewidth(ESC1, 0) 
+
+max_value = 2000 #change this if your ESC's max value is different or leave it be
+min_value = 700  #change this if your ESC's min value is different or leave it be
+
+def motorkalibrasyonu():
+    
+    pi.set_servo_pulsewidth(ESC, 0)
+    pi.set_servo_pulsewidth(ESC1, 0)
+    print("Disconnect the battery and press Enter")
+    
+    pi.set_servo_pulsewidth(ESC, max_value)
+    pi.set_servo_pulsewidth(ESC1, max_value)
+    print("Connect the battery NOW.. you will here two beeps, then wait for a gradual falling tone then press Enter")
+    pi.set_servo_pulsewidth(ESC, min_value)
+    pi.set_servo_pulsewidth(ESC1, min_value)
+    print ('Wierd eh! Special tone')
+    time.sleep(2)
+    print ('Wait for it ....')
+    time.sleep (2)
+    print ('Im working on it, DONT WORRY JUST WAIT.....')
+    pi.set_servo_pulsewidth(ESC, 0)
+    pi.set_servo_pulsewidth(ESC1, 0)
+    time.sleep(2)
+    print ('Arming ESC now...')
+    pi.set_servo_pulsewidth(ESC, min_value)
+    pi.set_servo_pulsewidth(ESC1, min_value)
+    time.sleep(2)
+    
+    pi.set_servo_pulsewidth(ESC, 0)
+    pi.set_servo_pulsewidth(ESC1, 0)
+    
+    GPIO.output(power_pin, 0) 
+    GPIO.output(power_pin1, 0)
+    pi.set_servo_pulsewidth(ESC, 0)
+    pi.set_servo_pulsewidth(ESC1, 0)
+    print("Disconnect the battery and press Enter")
+    pi.set_servo_pulsewidth(ESC, max_value)
+    pi.set_servo_pulsewidth(ESC1, max_value)
+    print("Connect the battery NOW.. you will here two beeps, then wait for a gradual falling tone then press Enter")
+    pi.set_servo_pulsewidth(ESC, min_value)
+    pi.set_servo_pulsewidth(ESC1, min_value)
+    print ('Wierd eh! Special tone')
+    time.sleep(2)
+    print ('Wait for it ....')
+    time.sleep (2)
+    print ('Im working on it, DONT WORRY JUST WAIT.....')
+    pi.set_servo_pulsewidth(ESC, 0)
+    pi.set_servo_pulsewidth(ESC1, 0)
+    time.sleep(2)
+    print ('Arming ESC now...')
+    pi.set_servo_pulsewidth(ESC, min_value)
+    pi.set_servo_pulsewidth(ESC1, min_value)
+    time.sleep(2)
+    print ('See.... uhhhhh')
+    
+
+def servo2likapat():  
+    sol.ChangeDutyCycle(2)#sol taraftaki servo motorun kapanmasi(2-7) icin istenilen aci degerin karsilik gelen sayisal deger
+    time.sleep(0.2)
+    sag.ChangeDutyCycle(9.3)#sag taraftaki servo motorun kapanmasi(7-12) icin istenilen aci degerin karsilik gelen sayisal deger
+    time.sleep(2)
+def servo2liac():
+    sag.ChangeDutyCycle(4)#sag taraftaki servo motorun acilmasi icin(2-7) icin istenilen aci degerin karsilik gelen sayisal deger.
+    time.sleep(0.2)
+    sol.ChangeDutyCycle(7.5)#sol taraftaki servo motorun kapanmasi(7-12) icin istenilen aci degerin karsilik gelen sayisal deger
+    time.sleep(2)   
+def servodisari():   
+    yukari.ChangeDutyCycle(2.3) #yukarialma
+    time.sleep(2)
+        
+    yukari.ChangeDutyCycle(9)
+    time.sleep(2)
+    
+    yukari.ChangeDutyCycle(2.3)
+    time.sleep(2)
+
+def dcmotorrun():
+    GPIO.output(in1,GPIO.HIGH) 
+    GPIO.output(in2,GPIO.LOW)
+    
+def ileri():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(1)
+    GPIO.output(power_pin, 1) 
+    GPIO.output(power_pin1, 1)
+    if (x < width/2-30):
+        speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+        speed1 = 1000
+        pi.set_servo_pulsewidth(ESC, speed)
+        pi.set_servo_pulsewidth(ESC1, speed1)
+        print ("İki Motor")
+        time.sleep(1)
+
+def otuzsagadon():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(0.5)
+    GPIO.output(power_pin, 1) 
+    GPIO.output(power_pin1, 1)
+    time.sleep(0.5)
+    speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(1.5)
+    return
+
+def gerigit():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(0.5)
+    GPIO.output(power_pin, 0) 
+    GPIO.output(power_pin1, 0)
+    time.sleep(0.5)
+    speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 1000
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    print ("İki Motor")
+    time.sleep(1)
+    return
+
+def servoPosition (x, y, radius):
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(0.5)
+    GPIO.output(power_pin, 1) 
+    GPIO.output(power_pin1, 1)
+    time.sleep(0.5)
+    if (x < width/2-30):
+        speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+        speed1 = 700
+        pi.set_servo_pulsewidth(ESC, speed)
+        pi.set_servo_pulsewidth(ESC1, speed1)
+        print ("Sol Motor")
+        time.sleep(1)
+        print ("sağa dön")
+
+    if (x > width/2+30):
+        speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+        speed1 = 1000
+        pi.set_servo_pulsewidth(ESC, speed)
+        pi.set_servo_pulsewidth(ESC1, speed1)
+        print ("Sağ Motor")
+        time.sleep(1)
+        print ("sola dön")
+        
+    if (y > angle/2-10):
+        print ("Yukarı bak!")
+    
+    if (y < angle/4-5):
+        print ("Aşağı bak!")
+        
+    if(radius < 250):
+        speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+        speed1 = 1000
+        pi.set_servo_pulsewidth(ESC, speed)
+        pi.set_servo_pulsewidth(ESC1, speed1)
+        time.sleep(1)
+        print("İleri git")
+        
+    if(radius > 250):
+        print("Geri git")    
+    
+
+    
+def kirmizialgila():
+    while True:
+        frame = vs.read()
+        frame = imutils.resize(frame, width)
+        frame = imutils.rotate(frame, angle)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    
+        colorLower = kirmizilower
+        colorUpper = kirmiziupper
+        mask = cv2.inRange(hsv, colorLower, colorUpper)
+        mask = cv2.erode(mask, None, iterations=2)
+        mask = cv2.dilate(mask, None, iterations=2)
+    
+        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE)
+        cnts = cnts[0] 
+        center = None
+    
+        if len(cnts) > 0:
+            c = max(cnts, key=cv2.contourArea)
+            ((x, y), radius) = cv2.minEnclosingCircle(c)
+            M = cv2.moments(c)
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+    
+            if radius > 10:
+               
+                cv2.circle(frame, (int(x), int(y)), int(radius),
+                    (0, 255, 255), 2)
+                servoPosition(int(x), int(y), radius) 
+                cv2.circle(frame, center, 5, (0, 0, 255), -1)
+               
+            else:
+                for i in range(3):
+                    time.sleep(1)
+                    print ("veri yok")
+        
+        cv2.imshow("Frame",frame)
+        key = cv2.waitKey(1) & 0xFF
+    
+        if key == ord("q"):
+            break
+
+def yesilalgila():
+    while True:
+        frame = vs.read()
+        frame = imutils.resize(frame, width)
+        frame = imutils.rotate(frame, angle)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        colorLower = yesillower
+        colorUpper = yesilupper
+        mask = cv2.inRange(hsv, colorLower, colorUpper)
+        mask = cv2.erode(mask, None, iterations=2)
+        mask = cv2.dilate(mask, None, iterations=2)
+        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE)
+        cnts = cnts[0] 
+        center = None
+    
+        if len(cnts) > 0:
+         
+            c = max(cnts, key=cv2.contourArea)
+            ((x, y), radius) = cv2.minEnclosingCircle(c)
+            M = cv2.moments(c)
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+    
+            if radius > 10:
+             
+                cv2.circle(frame, (int(x), int(y)), int(radius),
+                    (0, 255, 255), 2)
+                servoPosition(int(x), int(y), radius) 
+                cv2.circle(frame, center, 5, (0, 0, 255), -1)
+                
+            else:
+                for i in range(5):
+                    time.sleep(3)
+                    print ("veri yok")
+        
+        cv2.imshow("Frame",frame)
+        key = cv2.waitKey(1) & 0xFF
+    
+        if key == ord("q"):
+            break
+def yesilalgilaveriyok():
+    while True:
+        frame = vs.read()
+        frame = imutils.resize(frame, width)
+        frame = imutils.rotate(frame, angle)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        colorLower = yesillower
+        colorUpper = yesilupper
+        mask = cv2.inRange(hsv, colorLower, colorUpper)
+        mask = cv2.erode(mask, None, iterations=2)
+        mask = cv2.dilate(mask, None, iterations=2)
+        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE)
+        cnts = cnts[0] 
+        center = None
+    
+        if len(cnts) > 0:
+         
+            c = max(cnts, key=cv2.contourArea)
+            ((x, y), radius) = cv2.minEnclosingCircle(c)
+            M = cv2.moments(c)
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+    
+            if radius > 10:
+             
+                cv2.circle(frame, (int(x), int(y)), int(radius),
+                    (0, 255, 255), 2)
+                servoPosition(int(x), int(y), radius) 
+                cv2.circle(frame, center, 5, (0, 0, 255), -1)
+                
+            else:
+                for i in range(5):
+                    time.sleep(3)
+                    otuzsagadon()
+        
+        cv2.imshow("Frame",frame)
+        key = cv2.waitKey(1) & 0xFF
+    
+        if key == ord("q"):
+            break
+def mavialgila():
+    while True:
+        frame = vs.read()
+        frame = imutils.resize(frame, width)
+        frame = imutils.rotate(frame, angle)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    
+        colorLower = maviLower
+        colorUpper = maviUpper
+        mask = cv2.inRange(hsv, colorLower, colorUpper)
+        mask = cv2.erode(mask, None, iterations=2)
+        mask = cv2.dilate(mask, None, iterations=2)
+    
+        contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST,
+            cv2.CHAIN_APPROX_SIMPLE)
+    
+        center = None
+        
+        centres = []
+        for i in range(len(contours)):
+            if(i < 2):
+                moments = cv2.moments(contours[i])
+                centres.append((int(moments['m10']/moments['m00']), int(moments['m01']/moments['m00'])))
+                area = cv2.contourArea(contours[i])
+                if(area > 500):
+                    cv2.drawContours(frame, contours[i], -1, (0, 255, 0), 3)
+                   
+                    c = 0
+                    for(x,y) in centres:
+                        c = c + x
+                        c = c / 2
+                        if(c <= width/2-30):
+                            speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+                            speed1 = 1000
+                            pi.set_servo_pulsewidth(ESC, speed)
+                            pi.set_servo_pulsewidth(ESC1, speed1)
+                            time.sleep(1)
+                            print("sola dön")
+                            
+                        if(c >= width/2+30):
+                            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+                            speed1 = 700
+                            pi.set_servo_pulsewidth(ESC, speed)
+                            pi.set_servo_pulsewidth(ESC1, speed1)
+                            time.sleep(1)
+                            print("sağa dön")
+                            
+                        if(width/2-30 < c < width/2+30):
+                            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+                            speed1 = 1000
+                            pi.set_servo_pulsewidth(ESC, speed)
+                            pi.set_servo_pulsewidth(ESC1, speed1)
+                            time.sleep(1)
+                            print("Devam et :)")
+                            servodisari()
+                            gerigit()
+                            pusula4()
+                        print (c)
+                    """
+                    if (area < width/2-30):
+                        panServoAngle += 10
+                        if panServoAngle > 140:
+                            panServoAngle = 140
+                            os.system("python angleServoCtrl.py " + str(panPin) + " " + str(panServoAngle))
+                            print ("sağa dön")
+    
+                    if (area > width/2+30):
+                        panServoAngle -= 10
+                        if panServoAngle < 40:
+                            panServoAngle = 40
+                            os.system("python angleServoCtrl.py " + str(panPin) + " " + str(panServoAngle))
+                            print ("sola dön")
+                    """
+        cv2.imshow("Frame",frame)
+        key = cv2.waitKey(1) & 0xFF
+    
+        if key == ord("q"):
+            break
+    
+    print("\n Exiting Program and cleanup stuff \n")
+    cv2.destroyAllWindows()
+    vs.stop()
+    
+def mavialgilasontur():
+    while True:
+        frame = vs.read()
+        frame = imutils.resize(frame, width)
+        frame = imutils.rotate(frame, angle)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    
+        colorLower = maviLower
+        colorUpper = maviUpper
+        mask = cv2.inRange(hsv, colorLower, colorUpper)
+        mask = cv2.erode(mask, None, iterations=2)
+        mask = cv2.dilate(mask, None, iterations=2)
+    
+    
+        contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST,
+            cv2.CHAIN_APPROX_SIMPLE)
+    
+        center = None
+        
+        centres = []
+        for i in range(len(contours)):
+            if(i < 2):
+                moments = cv2.moments(contours[i])
+                centres.append((int(moments['m10']/moments['m00']), int(moments['m01']/moments['m00'])))
+                area = cv2.contourArea(contours[i])
+                if(area > 500):
+                    cv2.drawContours(frame, contours[i], -1, (0, 255, 0), 3)
+                    
+                    c = 0
+                    for(x,y) in centres:
+                        c = c + x
+                        c = c / 2
+                        if(c <= width/2-30):
+                            speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+                            speed1 = 1000
+                            pi.set_servo_pulsewidth(ESC, speed)
+                            pi.set_servo_pulsewidth(ESC1, speed1)
+                            time.sleep(1)
+                            print("sola dön")
+                            
+                        if(c >= width/2+30):
+                            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+                            speed1 = 700
+                            pi.set_servo_pulsewidth(ESC, speed)
+                            pi.set_servo_pulsewidth(ESC1, speed1)
+                            time.sleep(1)
+                            print("sağa dön")
+                            
+                        if(width/2-30 < c < width/2+30):
+                            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+                            speed1 = 1000
+                            pi.set_servo_pulsewidth(ESC, speed)
+                            pi.set_servo_pulsewidth(ESC1, speed1)
+                            time.sleep(1)
+                            print("Devam et :)")
+                            servodisari()
+                            gerigit()
+                            pusula4()
+                        print (c)
+                    """
+                    if (area < width/2-30):
+                        panServoAngle += 10
+                        if panServoAngle > 140:
+                            panServoAngle = 140
+                            os.system("python angleServoCtrl.py " + str(panPin) + " " + str(panServoAngle))
+                            print ("sağa dön")
+    
+                    if (area > width/2+30):
+                        panServoAngle -= 10
+                        if panServoAngle < 40:
+                            panServoAngle = 40
+                            os.system("python angleServoCtrl.py " + str(panPin) + " " + str(panServoAngle))
+                            print ("sola dön")
+                    """
+        cv2.imshow("Frame",frame)
+        key = cv2.waitKey(1) & 0xFF
+    
+        if key == ord("q"):
+            break
+    
+    print("\n Exiting Program and cleanup stuff \n")
+    cv2.destroyAllWindows()
+    vs.stop()
+
+""" 
+def gemituru():
+    servo2likapat    
+    if pusula < 110 or pusula > 300:
+        sag
+    if pusula < 300 & pusula > 130
+        sol
+    if 110 <= pusula & pusula <= 130:
+        ileri
+        if sensoralgila==1:
+            if 20 < pusula & pusula < 180:
+                sol
+            if 180 < pusula & pusula < 340:
+                sag
+            if 340 <= pusula or pusula <= 20:
+                servo2liac
+                mavialgila
+                servodisari
+                2sngeri
+                servo2likapat
+                return
+"""
+
+
+def Magnetometer_Init():
+        bus.write_byte_data(Device_Address, Register_A, 0x70)
+
+        bus.write_byte_data(Device_Address, Register_B, 0xa0)
+
+        bus.write_byte_data(Device_Address, Register_mode, 0)
+
+def read_raw_data(addr):
+    
+        high = bus.read_byte_data(Device_Address, addr)
+        low = bus.read_byte_data(Device_Address, addr+1)
+
+        value = ((high << 8) | low)
+
+        if(value > 32768):
+            value = value - 65536
+        return value
+
+
+bus = smbus.SMBus(1)    # or bus = smbus.SMBus(0) for older version boards
+Device_Address = 0x1e   # HMC5883L magnetometer device address
+
+Magnetometer_Init()     # initialize HMC5883L magnetometer 
+    
+print (" Reading Heading Angle")
+
+def pusula1():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(0.5)
+    GPIO.output(power_pin, 1) 
+    GPIO.output(power_pin1, 1)
+    time.sleep(0.5)
+    while True:
+        x = read_raw_data(X_axis_H)
+        z = read_raw_data(Z_axis_H)
+        y = read_raw_data(Y_axis_H)
+    
+        heading = math.atan2(y, x) + declination
+            
+        if(heading > 2*pi):
+            heading = heading - 2*pi
+
+        if(heading < 0):
+            heading = heading + 2*pi
+    
+        pusula = int(heading * 180/pi)
+    
+        print ("Pusula = %d°" %pusula)
+        
+        if 20 < pusula & pusula < 180:
+            speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 1000
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sağ Motor-sola dön")
+            time.sleep(1)
+        if 180 < pusula & pusula < 340:
+            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 700
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sol Motor-sağa dön")
+            time.sleep(1)
+        if 340 <= pusula or pusula <= 20:
+            yesilalgila()
+            break
+            
+def pusula2():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(0.5)
+    GPIO.output(power_pin, 1) 
+    GPIO.output(power_pin1, 1)
+    time.sleep(0.5)
+    while True:
+        #Read Accelerometer raw value
+        x = read_raw_data(X_axis_H)
+        z = read_raw_data(Z_axis_H)
+        y = read_raw_data(Y_axis_H)
+    
+        heading = math.atan2(y, x) + declination
+            
+        if(heading > 2*pi):
+            heading = heading - 2*pi
+    
+        if(heading < 0):
+            heading = heading + 2*pi
+    
+        pusula = int(heading * 180/pi)
+    
+        print ("Pusula = %d°" %pusula)
+        if 320 > pusula or pusula < 100:
+            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 700
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sol Motor-sağa dön")
+            time.sleep(1)
+        if 120 < pusula & pusula <320:
+            speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 1000
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sağ Motor-sola dön")
+            time.sleep(1)
+        if 100 <= pusula & pusula <= 120:
+            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 1000
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sağ Motor")
+            time.sleep(1)
+            if not GPIO.input(sensor) & GPIO.input(sensorsol) & GPIO.input(sensorsağ):
+                speed = 700   # change your speed if you want to.... it should be between 700 - 2000
+                speed1 = 700
+                pi.set_servo_pulsewidth(ESC, speed)
+                pi.set_servo_pulsewidth(ESC1, speed1)
+                print ("boş")
+                time.sleep(1)
+                pusula3()
+                
+def pusula3():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(1)
+    GPIO.output(power_pin, 1) 
+    GPIO.output(power_pin1, 1)
+    while True:
+        x = read_raw_data(X_axis_H)
+        z = read_raw_data(Z_axis_H)
+        y = read_raw_data(Y_axis_H)
+    
+        heading = math.atan2(y, x) + declination
+            
+        if(heading > 2*pi):
+            heading = heading - 2*pi
+    
+        if(heading < 0):
+            heading = heading + 2*pi
+    
+        pusula = int(heading * 180/pi)
+    
+        print ("Pusula = %d°" %pusula)
+        if 160 > pusula & pusula < 320:
+            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 700
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sol Motor-sağa dön")
+            time.sleep(1)
+        if 20 < pusula & pusula <160:
+            speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 1000
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sağ Motor-sola dön")
+            time.sleep(1)
+        if 320 <= pusula & pusula <= 340:
+            mavialgila()
+        if 340 < pusula & pusula <= 359:
+            mavialgila()
+        if 0 <= pusula & pusula <= 20:
+            mavialgila()
+
+def pusula4():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(1)
+    GPIO.output(power_pin, 1) 
+    GPIO.output(power_pin1, 1)
+    while True:
+        x = read_raw_data(X_axis_H)
+        z = read_raw_data(Z_axis_H)
+        y = read_raw_data(Y_axis_H)
+    
+        heading = math.atan2(y, x) + declination
+            
+        if(heading > 2*pi):
+            heading = heading - 2*pi
+    
+        if(heading < 0):
+            heading = heading + 2*pi
+    
+        pusula = int(heading * 180/pi)
+    
+        print ("Pusula = %d°" %pusula)
+        if 90 > pusula & pusula < 260:
+            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 700
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sol Motor-sağa dön")
+            time.sleep(1)
+        if 90 <= pusula or pusula < 280:
+            speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 1000
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sağ Motor-sola dön")
+            time.sleep(1)
+        if 260 <= pusula & pusula <= 280:
+            speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 700
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            time.sleep(1)
+            GPIO.output(power_pin, 1) 
+            GPIO.output(power_pin1, 1)
+            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 1000
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("İki Motor")
+            time.sleep(1)
+            if not GPIO.input(sensor) & GPIO.input(sensorsol) & GPIO.input(sensorsağ):
+                speed = 700   # change your speed if you want to.... it should be between 700 - 2000
+                speed1 = 700
+                pi.set_servo_pulsewidth(ESC, speed)
+                pi.set_servo_pulsewidth(ESC1, speed1)
+                print ("boş")
+                time.sleep(1)
+                pusula1()
+                
+            
+def pusula2sontur():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(0.5)
+    GPIO.output(power_pin, 1) 
+    GPIO.output(power_pin1, 1)
+    time.sleep(0.5)
+    while True:
+        x = read_raw_data(X_axis_H)
+        z = read_raw_data(Z_axis_H)
+        y = read_raw_data(Y_axis_H)
+    
+        heading = math.atan2(y, x) + declination
+            
+        if(heading > 2*pi):
+            heading = heading - 2*pi
+    
+        if(heading < 0):
+            heading = heading + 2*pi
+    
+        pusula = int(heading * 180/pi)
+    
+        print ("Pusula = %d°" %pusula)
+        if 270 > pusula or pusula < 80:
+            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 700
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sol Motor-sağa dön")
+            time.sleep(1)
+        if 80 < pusula & pusula <270:
+            speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 1000
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sağ Motor-sola dön")
+            time.sleep(1)
+        if 80 <= pusula & pusula <= 100:
+            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 1000
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sağ Motor")
+            time.sleep(1)
+            if not GPIO.input(sensor) & GPIO.input(sensorsol) & GPIO.input(sensorsağ):
+                speed = 700   # change your speed if you want to.... it should be between 700 - 2000
+                speed1 = 700
+                pi.set_servo_pulsewidth(ESC, speed)
+                pi.set_servo_pulsewidth(ESC1, speed1)
+                print ("boş")
+                time.sleep(1)
+                pusula3sontur()
+                
+def pusula3sontur():
+    speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+    speed1 = 700
+    pi.set_servo_pulsewidth(ESC, speed)
+    pi.set_servo_pulsewidth(ESC1, speed1)
+    time.sleep(1)
+    GPIO.output(power_pin, 1) 
+    GPIO.output(power_pin1, 1)
+    while True:
+        x = read_raw_data(X_axis_H)
+        z = read_raw_data(Z_axis_H)
+        y = read_raw_data(Y_axis_H)
+    
+        heading = math.atan2(y, x) + declination
+            
+        if(heading > 2*pi):
+            heading = heading - 2*pi
+    
+        if(heading < 0):
+            heading = heading + 2*pi
+    
+        pusula = int(heading * 180/pi)
+    
+        print ("Pusula = %d°" %pusula)
+        if 160 > pusula & pusula < 320:
+            speed = 1000    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 700
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sol Motor-sağa dön")
+            time.sleep(1)
+        if 20 < pusula & pusula <160:
+            speed = 700    # change your speed if you want to.... it should be between 700 - 2000
+            speed1 = 1000
+            pi.set_servo_pulsewidth(ESC, speed)
+            pi.set_servo_pulsewidth(ESC1, speed1)
+            print ("Sağ Motor-sola dön")
+            time.sleep(1)
+        if 320 <= pusula & pusula <= 340:
+            mavialgila()
+        if 340 < pusula & pusula <= 359:
+            mavialgila()
+        if 0 <= pusula & pusula <= 20:
+            mavialgilason()
+
+def derecelikontrol1():
+    x = read_raw_data(X_axis_H)
+    z = read_raw_data(Z_axis_H)
+    y = read_raw_data(Y_axis_H)
+    
+    heading = math.atan2(y, x) + declination
+    
+    if(heading > 2*pi):
+        heading = heading - 2*pi
+    
+    if(heading < 0):
+        heading = heading + 2*pi
+
+    pusula = int(heading * 180/pi)
+    
+    print ("Pusula = %d°" %pusula)
+    
+    while True:
+        if pusula >= 260 or pusula <= 320:
+            otuzsagadön()
+        if pusula > 320 & pusula <= 350:
+            yesilalgilaveriyok()
+        if pusula > 350 or pusula <= 20:
+                yesilalgilaveriyok()
+        if pusula > 20 & pusula <= 50:
+            yesilalgilaveriyok()
+        if pusula > 80 & pusula< 100:
+            sontur()                
+    
+def sontur():
+    pusula2sontur()
+                
+while (1):    
+    motorkalibrasyonu()
+    break
+    servo2liac()
+    break
+    pusula1()
+    break
